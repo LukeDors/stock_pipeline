@@ -4,3 +4,6 @@ terraform/
 *.tfstate.*
 
 data/
+*.parquet
+
+venv/
