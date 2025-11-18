@@ -33,7 +33,11 @@ df.printSchema()
 df = df.dropDuplicates()
 
 #remove ticker column
-df = df.drop('Ticker')
+distinct_tickers = df.select("Ticker").distinct()
+w = Window.orderBy("Ticker")
+mapping = distinct_tickers.withColumn("ticker_id", F.row_number().over(w))
+df = df.join(mapping, on="Ticker", how="left")
+df = df.drop("Ticker")
 
 #handle missing values
 critical_columns = ['Date', 'Close', 'Volume']
@@ -54,8 +58,6 @@ for column in numeric_columns:
             column,
             regexp_replace(col(column).cast('string'), '[^0-9.]', '').cast(DoubleType())
         )
-        if column != 'Volume':
-            df = df.filter(col(column) > 0)
 
 if 'Date' in df.columns:
     df = df.orderBy('Date')

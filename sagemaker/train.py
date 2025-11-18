@@ -17,7 +17,7 @@ AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 
 def download_data_from_s3(bucket, prefix='cleaned/'):
-    """Download cleaned parquet data from S3"""
+
     print(f"Downloading data from s3://{bucket}/{prefix}")
     
     #list parquet files
@@ -62,8 +62,9 @@ def prepare_data_for_prophet(df):
     
     return prophet_df
 
+#train prophet model
 def train_prophet_model(df):
-    """Train Prophet model"""
+
     print("Training Prophet model...")
     
     #base params
