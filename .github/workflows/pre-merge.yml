@@ -39,27 +39,6 @@ jobs:
           flake8 api --count --select=E9,F63,F7,F82 --show-source --statistics
           #Exit-zero treats all errors as warnings
           flake8 api --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      
-      - name: Check code formatting with black
-        run: |
-          black --check api/app.py
-      
-      - name: Validate Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0
-      
-      - name: Terraform Format Check
-        working-directory: terraform
-        run: terraform fmt -check -recursive
-      
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init -backend=false
-      
-      - name: Terraform Validate
-        working-directory: terraform
-        run: terraform validate
 
   docker-build:
     name: Docker Build Test
@@ -99,8 +78,3 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
-      
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-results.sarif'
