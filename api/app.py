@@ -31,14 +31,14 @@ last_updated = None
 #Pydantic models
 class PredictionRequest(BaseModel):
     date: str = Field(..., description="Date in YYYY-MM-DD format")
-    
+
 class PredictionResponse(BaseModel):
     date: str
     predicted_price: float
     lower_bound: float
     upper_bound: float
     trend: float
-    
+
 class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
@@ -47,28 +47,27 @@ class HealthResponse(BaseModel):
 def load_model_from_s3():
     """Load the latest model from S3"""
     global model, forecast_df, last_updated
-    
+
     try:
         #model timestamp
         latest_obj = s3_client.get_object(Bucket=MODEL_BUCKET, Key='models/latest.txt')
         timestamp = latest_obj['Body'].read().decode('utf-8').strip()
-        
+
         #load model
         model_key = f'models/{timestamp}/model.pkl'
         model_obj = s3_client.get_object(Bucket=MODEL_BUCKET, Key=model_key)
         model = pickle.loads(model_obj['Body'].read())
-        
+
         #load forecast
         forecast_key = f'models/{timestamp}/forecast.csv'
         forecast_obj = s3_client.get_object(Bucket=MODEL_BUCKET, Key=forecast_key)
         forecast_df = pd.read_csv(BytesIO(forecast_obj['Body'].read()))
         forecast_df['ds'] = pd.to_datetime(forecast_df['ds'])
-        
+
         last_updated = timestamp
-        
         print(f"Model loaded successfully. Timestamp: {timestamp}")
         return True
-        
+
     except Exception as e:
         print(f"Error loading model: {str(e)}")
         return False
@@ -95,19 +94,21 @@ async def predict(request: PredictionRequest):
     """Get prediction for a specific date"""
     if model is None or forecast_df is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    
+
     try:
+        #parse date
         target_date = pd.to_datetime(request.date)
-        
+
+        #find pred
         prediction = forecast_df[forecast_df['ds'] == target_date]
-        
+
         if prediction.empty:
-            # If date not in forecast, generate new prediction
+            #if date not in forecast, generate new prediction
             future = pd.DataFrame({'ds': [target_date]})
             prediction = model.predict(future)
         else:
             prediction = prediction.iloc[0]
-        
+
         return PredictionResponse(
             date=target_date.strftime('%Y-%m-%d'),
             predicted_price=float(prediction['yhat']),
@@ -115,7 +116,7 @@ async def predict(request: PredictionRequest):
             upper_bound=float(prediction['yhat_upper']),
             trend=float(prediction['trend'])
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error making prediction: {str(e)}")
 
@@ -123,7 +124,7 @@ async def predict(request: PredictionRequest):
 async def reload_model():
     """Reload model from S3"""
     success = load_model_from_s3()
-    
+
     if success:
         return {"status": "success", "message": "Model reloaded successfully", "timestamp": last_updated}
     else:
@@ -134,7 +135,7 @@ async def model_info():
     """Get information about the loaded model"""
     if model is None or forecast_df is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    
+
     return {
         "status": "loaded",
         "last_updated": last_updated,
