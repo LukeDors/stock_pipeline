@@ -39,6 +39,9 @@ def download_data_from_s3(bucket, prefix='cleaned/'):
     #combine
     df = pd.concat(dfs, ignore_index=True)
     print(f"Loaded {len(df)} records")
+    #get most common ticker
+    most_common = df['ticker_id'].mode()[0]
+    df = df[df['ticker_id']==most_common]
     return df
 
 def prepare_data_for_prophet(df):

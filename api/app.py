@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime, timedelta
 import pandas as pd
 import pickle
@@ -43,10 +43,6 @@ class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     last_updated: Optional[str]
-    
-class BatchPredictionRequest(BaseModel):
-    start_date: str = Field(..., description="Start date in YYYY-MM-DD format")
-    end_date: str = Field(..., description="End date in YYYY-MM-DD format")
 
 def load_model_from_s3():
     """Load the latest model from S3"""
@@ -101,14 +97,12 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
-        #parse date
         target_date = pd.to_datetime(request.date)
         
-        #find pred
         prediction = forecast_df[forecast_df['ds'] == target_date]
         
         if prediction.empty:
-            #if date not in forecast, generate new prediction
+            # If date not in forecast, generate new prediction
             future = pd.DataFrame({'ds': [target_date]})
             prediction = model.predict(future)
         else:
@@ -124,48 +118,6 @@ async def predict(request: PredictionRequest):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error making prediction: {str(e)}")
-
-@app.post("/predict/batch")
-async def predict_batch(request: BatchPredictionRequest):
-    """Get predictions for a date range"""
-    if model is None or forecast_df is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    
-    try:
-        #parse dates
-        start_date = pd.to_datetime(request.start_date)
-        end_date = pd.to_datetime(request.end_date)
-        
-        if start_date > end_date:
-            raise HTTPException(status_code=400, detail="start_date must be before end_date")
-        
-        #filter forecast for date range
-        mask = (forecast_df['ds'] >= start_date) & (forecast_df['ds'] <= end_date)
-        predictions = forecast_df[mask]
-        
-        if predictions.empty:
-            #generate new predicitons
-            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-            future = pd.DataFrame({'ds': date_range})
-            predictions = model.predict(future)
-        
-        #format response
-        results = []
-        for _, row in predictions.iterrows():
-            results.append({
-                'date': row['ds'].strftime('%Y-%m-%d'),
-                'predicted_price': float(row['yhat']),
-                'lower_bound': float(row['yhat_lower']),
-                'upper_bound': float(row['yhat_upper']),
-                'trend': float(row['trend'])
-            })
-        
-        return results
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error making predictions: {str(e)}")
 
 @app.post("/model/reload")
 async def reload_model():
@@ -200,7 +152,6 @@ async def root():
         "endpoints": {
             "health": "/health",
             "predict": "/predict",
-            "batch_predict": "/predict/batch",
             "model_info": "/model/info",
             "reload_model": "/model/reload"
         }
